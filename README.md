@@ -18,8 +18,7 @@
 
 ```text
 pvi-report-assistant/
-  data/
-    raw/          # 原始数据
+  data/          
     sample/       # 脱敏样例数据
   output/         # 自动生成的报告和看板
   src/
