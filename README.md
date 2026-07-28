@@ -27,6 +27,7 @@ pvi-report-assistant/
     metrics.py
     dashboard.py
     report_export.py
+    summary.py
     main.py
   README.md
   requirements.txt
