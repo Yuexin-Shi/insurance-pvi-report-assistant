@@ -1,5 +1,8 @@
 # 保险经销业务 PVI 经营分析与智能报表生成系统
 
+在线 Demo：https://insurance-pvi-report-assistant.streamlit.app/  
+项目代码：https://github.com/Yuexin-Shi/insurance-pvi-report-assistant
+
 ## 项目背景
 
 本项目面向保险公司经销业务部日常经营管理场景，用于将每日保单汇总明细自动加工为 PVI 经营看板、多页签 Excel 追踪报告和文字经营摘要，减少人工汇总、重复制表和报告撰写工作。
