@@ -1,7 +1,7 @@
 # 保险经销业务 PVI 经营分析与智能报表生成系统
 
-在线 Demo：https://insurance-pvi-report-assistant.streamlit.app/  
-项目代码：https://github.com/Yuexin-Shi/insurance-pvi-report-assistant
+在线 Demo：[Streamlit App](https://insurance-pvi-report-assistant.streamlit.app/)  
+项目代码：[GitHub Repository](https://github.com/Yuexin-Shi/insurance-pvi-report-assistant)
 
 ## 项目背景
 
