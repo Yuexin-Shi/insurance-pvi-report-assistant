@@ -1,0 +1,207 @@
+[
+  {
+    "question": "PVI 是什么",
+    "expected_intent": "metric_definition",
+    "expected_keywords": ["核心经营指标", "PVI"]
+  },
+  {
+    "question": "PVI是什么意思",
+    "expected_intent": "metric_definition",
+    "expected_keywords": ["核心经营指标", "保单汇总表"]
+  },
+  {
+    "question": "净PVI怎么算",
+    "expected_intent": "metric_definition",
+    "expected_keywords": ["净 PVI", "有效保单", "PVI"]
+  },
+  {
+    "question": "每日净PVI怎么统计",
+    "expected_intent": "metric_definition",
+    "expected_keywords": ["每日净 PVI", "承保日期"]
+  },
+  {
+    "question": "本月累计PVI怎么定义",
+    "expected_intent": "metric_definition",
+    "expected_keywords": ["本月累计 PVI", "当月月初", "报告日期"]
+  },
+  {
+    "question": "目标达成率怎么定义",
+    "expected_intent": "metric_definition",
+    "expected_keywords": ["目标达成率", "本月累计", "月度目标"]
+  },
+  {
+    "question": "目标缺口是什么意思",
+    "expected_intent": "metric_definition",
+    "expected_keywords": ["目标缺口", "月度目标"]
+  },
+  {
+    "question": "月末预测怎么计算",
+    "expected_intent": "metric_definition",
+    "expected_keywords": ["月末预测", "正常业务预测"]
+  },
+  {
+    "question": "正常业务预测是什么意思",
+    "expected_intent": "metric_definition",
+    "expected_keywords": ["正常业务预测", "最大一笔 PVI", "日均 PVI"]
+  },
+  {
+    "question": "最大一笔PVI是什么意思",
+    "expected_intent": "metric_definition",
+    "expected_keywords": ["最大一笔 PVI", "单笔业务"]
+  },
+  {
+    "question": "信泰方案规则是什么",
+    "expected_intent": "business_rule",
+    "expected_keywords": ["信泰", "20,000", "30,000"]
+  },
+  {
+    "question": "阳光七八联动方案标准是什么",
+    "expected_intent": "business_rule",
+    "expected_keywords": ["七八联动", "100,000", "承保 PVI"]
+  },
+  {
+    "question": "经营看板包含哪些内容",
+    "expected_intent": "business_rule",
+    "expected_keywords": ["每日 PVI", "代理人", "产品", "保险公司"]
+  },
+  {
+    "question": "Excel经营报告有什么内容",
+    "expected_intent": "business_rule",
+    "expected_keywords": ["Excel 经营报告", "多页签", "经营追踪"]
+  },
+  {
+    "question": "文字经营摘要会生成什么",
+    "expected_intent": "business_rule",
+    "expected_keywords": ["文字经营摘要", "今日新增 PVI", "业务跟进建议"]
+  },
+  {
+    "question": "今日PVI是多少",
+    "expected_intent": "pvi_total_query",
+    "expected_keywords": ["今日PVI", "10,903"]
+  },
+  {
+    "question": "今天PVI有多少",
+    "expected_intent": "pvi_total_query",
+    "expected_keywords": ["今日PVI", "10,903"]
+  },
+  {
+    "question": "本月PVI是多少",
+    "expected_intent": "pvi_total_query",
+    "expected_keywords": ["本月PVI", "2,143,979.82"]
+  },
+  {
+    "question": "今月PVI有多少",
+    "expected_intent": "pvi_total_query",
+    "expected_keywords": ["本月PVI", "2,143,979.82"]
+  },
+  {
+    "question": "今天都谁出单了",
+    "expected_intent": "active_agent_query",
+    "expected_keywords": ["今日出单代理人共", "合计 PVI"]
+  },
+  {
+    "question": "今天出单人数是多少",
+    "expected_intent": "active_agent_query",
+    "expected_keywords": ["今日出单代理人共", "4 人"]
+  },
+  {
+    "question": "本月出单代理人有哪些",
+    "expected_intent": "active_agent_query",
+    "expected_keywords": ["本月出单代理人共", "合计 PVI"]
+  },
+  {
+    "question": "本月PVI最高的是谁",
+    "expected_intent": "agent_ranking_query",
+    "expected_keywords": ["本月代理人 PVI Top 1"]
+  },
+  {
+    "question": "今天PVI最高的是谁",
+    "expected_intent": "agent_ranking_query",
+    "expected_keywords": ["今日代理人 PVI Top 1"]
+  },
+  {
+    "question": "代理人PVI排名前五是谁",
+    "expected_intent": "agent_ranking_query",
+    "expected_keywords": ["本月代理人 PVI Top 5"]
+  },
+  {
+    "question": "本月产品PVI最高的是哪个",
+    "expected_intent": "product_ranking_query",
+    "expected_keywords": ["本月产品 PVI Top 5"]
+  },
+  {
+    "question": "今天产品PVI最高的是哪个",
+    "expected_intent": "product_ranking_query",
+    "expected_keywords": ["今日产品 PVI Top 5"]
+  },
+  {
+    "question": "本月险种排名怎么看",
+    "expected_intent": "product_ranking_query",
+    "expected_keywords": ["本月产品 PVI Top 5"]
+  },
+  {
+    "question": "本月保险公司PVI最高的是哪家",
+    "expected_intent": "company_ranking_query",
+    "expected_keywords": ["本月保险公司 PVI Top 5"]
+  },
+  {
+    "question": "今天保险公司PVI最高的是哪家",
+    "expected_intent": "company_ranking_query",
+    "expected_keywords": ["今日保险公司 PVI Top 5"]
+  },
+  {
+    "question": "哪家保险公司贡献最高",
+    "expected_intent": "company_ranking_query",
+    "expected_keywords": ["本月保险公司 PVI Top 5"]
+  },
+  {
+    "question": "客户名单怎么导出",
+    "expected_intent": "unknown",
+    "expected_keywords": ["没有在知识库或数据表中找到明显相关内容"]
+  },
+  {
+    "question": "怎么报销差旅费",
+    "expected_intent": "unknown",
+    "expected_keywords": ["没有在知识库或数据表中找到明显相关内容"]
+  },
+  {
+    "question": "客户联系电话是多少",
+    "expected_intent": "unknown",
+    "expected_keywords": ["没有在知识库或数据表中找到明显相关内容"]
+  },
+  {
+    "question": "今日PVI是多少，今天PVI最高的是谁",
+    "expected_intents": ["pvi_total_query", "agent_ranking_query"],
+    "expected_keywords": ["今日PVI", "今日代理人 PVI Top 1"]
+  },
+  {
+    "question": "今天都谁出单了，本月PVI是多少，PVI是什么",
+    "expected_intents": ["active_agent_query", "pvi_total_query", "metric_definition"],
+    "expected_keywords": ["今日出单代理人共", "本月PVI", "核心经营指标"]
+  },
+  {
+    "question": "信泰方案规则是什么，目标达成率怎么定义",
+    "expected_intents": ["business_rule", "metric_definition"],
+    "expected_keywords": ["信泰", "目标达成率"]
+  },
+  {
+    "question": "今天pvi多少",
+    "expected_intent": "pvi_total_query",
+    "expected_keywords": ["今日PVI", "10,903"]
+  },
+  {
+    "question": "本月哪个业务员最厉害",
+    "expected_intent": "agent_ranking_query",
+    "expected_keywords": ["本月代理人 PVI Top 1"]
+  },
+  {
+    "question": "今天有几个人出单",
+    "expected_intent": "active_agent_query",
+    "expected_keywords": ["今日出单代理人共", "4 人"]
+  },
+  {
+    "question": "PVI达成率咋算",
+    "expected_intent": "metric_definition",
+    "expected_keywords": ["目标达成率", "本月累计", "月度目标"]
+  }
+]

@@ -5,6 +5,7 @@ import pandas as pd
 from config import *
 from dashboard import draw_dashboard
 from data_cleaning import clean_data, latest_source_file
+from insight import generate_insight, save_insight
 from metrics import calculate_reports, determine_report_date, money
 from report_export import export_excel
 from summary import generate_summary, save_summary
@@ -35,6 +36,7 @@ def main() -> None:
     dashboard_path = output_dir / f"PVI经营看板_{date_code}.png"
     excel_path = output_dir / f"PVI经营报告_{date_code}.xlsx"
     summary_path = output_dir / f"经营摘要_{date_code}.txt"
+    insight_path = output_dir / f"智能解读_{date_code}.txt"
     draw_dashboard(reports, dashboard_path, report_date, PVI_THRESHOLD)
     export_excel(reports, excel_path, dashboard_path, report_date)
 
@@ -54,6 +56,8 @@ def main() -> None:
     assert isinstance(metrics, dict)
     summary_text = generate_summary(reports, report_date, today_pvi, MONTHLY_TARGET)
     save_summary(summary_text, summary_path)
+    insight_text = generate_insight(reports, report_date, today_pvi, MONTHLY_TARGET)
+    save_insight(insight_text, insight_path)
     print(f"数据文件：{input_path}")
     print(f"报告日期：{report_date:%Y-%m-%d}")
     print(f"今日PVI：{money(today_pvi)} 元") # 现在这里就不会报错了
@@ -63,6 +67,8 @@ def main() -> None:
     print(f"月度目标缺口：{money(metrics['target_gap'])} 元")
     print(f"经营摘要：{summary_path}")
     print(summary_text)
+    print(f"智能解读：{insight_path}")
+    print(insight_text)
     print(f"图片看板：{dashboard_path}")
     print(f"Excel报告：{excel_path}")
 

@@ -1,0 +1,837 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PVI 经营知识助手 Demo</title>
+  <style>
+    :root {
+      --bg: #f4f6f8;
+      --panel: #ffffff;
+      --line: #dfe4ea;
+      --text: #1f2933;
+      --muted: #6b7280;
+      --blue: #2563eb;
+      --blue-soft: #e8f1ff;
+      --green: #15803d;
+      --amber: #b45309;
+      --red: #b91c1c;
+      --shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      line-height: 1.5;
+    }
+
+    .shell {
+      width: min(1180px, calc(100vw - 40px));
+      margin: 28px auto;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      overflow: hidden;
+      background: #f7f8fa;
+      box-shadow: var(--shadow);
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--line);
+      background: #f2f4f7;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    .logo {
+      display: grid;
+      width: 40px;
+      height: 40px;
+      place-items: center;
+      border: 1px solid #8bbcff;
+      border-radius: 8px;
+      background: #e2efff;
+      color: #134aa9;
+      font-weight: 700;
+    }
+
+    .brand-title {
+      font-size: 18px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .role {
+      color: var(--muted);
+      font-size: 14px;
+      white-space: nowrap;
+    }
+
+    .user-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 10px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: #fff;
+      color: var(--muted);
+      font-size: 13px;
+      white-space: nowrap;
+    }
+
+    .main {
+      display: grid;
+      grid-template-columns: 280px minmax(0, 1fr) 300px;
+      min-height: 720px;
+    }
+
+    .sidebar,
+    .rightbar {
+      padding: 18px;
+      background: #f7f8fa;
+    }
+
+    .sidebar {
+      border-right: 1px solid var(--line);
+    }
+
+    .rightbar {
+      border-left: 1px solid var(--line);
+    }
+
+    .content {
+      padding: 18px;
+      background: #fbfcfd;
+    }
+
+    .section-title {
+      margin: 18px 0 10px;
+      color: var(--muted);
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .section-title:first-child {
+      margin-top: 0;
+    }
+
+    .nav-button,
+    .quick-button {
+      width: 100%;
+      margin-bottom: 10px;
+      padding: 13px 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      color: var(--text);
+      text-align: left;
+      font-size: 16px;
+      cursor: pointer;
+    }
+
+    .nav-button.active,
+    .quick-button:hover {
+      border-color: #8bbcff;
+      background: var(--blue-soft);
+    }
+
+    .card {
+      margin-bottom: 14px;
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+    }
+
+    .card.blue {
+      border-color: #93c5fd;
+      background: var(--blue-soft);
+    }
+
+    .card h3 {
+      margin: 0 0 8px;
+      font-size: 16px;
+    }
+
+    .card p {
+      margin: 0;
+      color: var(--muted);
+    }
+
+    .question {
+      margin-bottom: 14px;
+      padding: 16px;
+      border: 1px solid #93c5fd;
+      border-radius: 8px;
+      background: var(--blue-soft);
+    }
+
+    .ask-box {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 86px;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    .ask-input {
+      min-width: 0;
+      padding: 12px 12px;
+      border: 1px solid #93c5fd;
+      border-radius: 8px;
+      background: #fff;
+      color: var(--text);
+      font: inherit;
+    }
+
+    .ask-button {
+      border: 1px solid #2563eb;
+      border-radius: 8px;
+      background: #2563eb;
+      color: #fff;
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .question-label,
+    .answer-label {
+      margin-bottom: 6px;
+      font-weight: 700;
+    }
+
+    .question-text {
+      font-size: 17px;
+    }
+
+    .answer {
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+    }
+
+    .answer-text {
+      margin-bottom: 14px;
+      font-size: 16px;
+      font-weight: 600;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      font-size: 14px;
+    }
+
+    th,
+    td {
+      padding: 11px 12px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      background: #f3f4f6;
+      font-weight: 700;
+    }
+
+    tr:last-child td {
+      border-bottom: 0;
+    }
+
+    .tag-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      padding: 5px 8px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: #fff;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .mini-list {
+      display: grid;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .mini-item {
+      padding: 9px 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .feedback-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .feedback-button {
+      padding: 9px 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      color: var(--text);
+      font: inherit;
+      cursor: pointer;
+    }
+
+    .feedback-button:hover {
+      border-color: #93c5fd;
+      background: var(--blue-soft);
+    }
+
+    .metric-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .metric {
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+    }
+
+    .metric-value {
+      margin-top: 6px;
+      font-size: 22px;
+      font-weight: 800;
+    }
+
+    .metric-note {
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .confidence {
+      height: 8px;
+      margin-top: 8px;
+      overflow: hidden;
+      border-radius: 999px;
+      background: #e5e7eb;
+    }
+
+    .confidence span {
+      display: block;
+      height: 100%;
+      border-radius: inherit;
+      background: var(--blue);
+    }
+
+    .status {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: 700;
+    }
+
+    .status.green {
+      color: var(--green);
+    }
+
+    .status.amber {
+      color: var(--amber);
+    }
+
+    .status.red {
+      color: var(--red);
+    }
+
+    .small {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .footer-note {
+      padding: 12px 18px;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 13px;
+      background: #f7f8fa;
+    }
+
+    @media (max-width: 980px) {
+      .main {
+        grid-template-columns: 1fr;
+      }
+
+      .sidebar,
+      .rightbar {
+        border: 0;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .rightbar {
+        border-top: 1px solid var(--line);
+      }
+
+      .role {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header class="topbar">
+      <div class="brand">
+        <div class="logo">AI</div>
+        <div>
+          <div class="brand-title">保险经销业务 PVI 智能助手</div>
+          <div class="small">报表生成 · 经营解读 · RAG 问答 · 向量检索</div>
+        </div>
+      </div>
+      <div class="user-pill">登录用户：数据岗 Demo · 权限：经销业务部 · 脱敏数据</div>
+    </header>
+
+    <div class="main">
+      <aside class="sidebar">
+        <div class="section-title">业务入口</div>
+        <button class="nav-button active" data-mode="analysis">经营问答</button>
+        <button class="nav-button" data-mode="report">报表与看板</button>
+        <button class="nav-button" data-mode="rules">指标口径</button>
+        <button class="nav-button" data-mode="tracking">专题追踪</button>
+        <button class="nav-button" data-mode="audit">日志与评估</button>
+        <button class="nav-button" data-mode="history">问答历史</button>
+        <button class="nav-button" data-mode="knowledge">知识库管理</button>
+        <button class="nav-button" data-mode="upload">管理员上传资料</button>
+        <button class="nav-button" data-mode="feedback">答案反馈</button>
+
+        <div class="section-title">常用问题</div>
+        <button class="quick-button" data-demo="analysis">今天pvi多少</button>
+        <button class="quick-button" data-demo="active">今天都谁出单了</button>
+        <button class="quick-button" data-demo="agent">本月哪个业务员最厉害</button>
+        <button class="quick-button" data-demo="rules">PVI达成率咋算</button>
+        <button class="quick-button" data-demo="combo">多问题组合查询</button>
+      </aside>
+
+      <main class="content">
+        <div class="metric-grid">
+          <div class="metric">
+            <div class="small">本月累计净 PVI</div>
+            <div class="metric-value">2,143,979.82</div>
+            <div class="metric-note">目标达成率 71.47%</div>
+          </div>
+          <div class="metric">
+            <div class="small">今日新增 PVI</div>
+            <div class="metric-value">10,903</div>
+            <div class="metric-note">报告日期 2026-07-28</div>
+          </div>
+          <div class="metric">
+            <div class="small">目标缺口</div>
+            <div class="metric-value">856,020.18</div>
+            <div class="metric-note">剩余工作日需加速推动</div>
+          </div>
+          <div class="metric">
+            <div class="small">问答评估</div>
+            <div class="metric-value">41/41</div>
+            <div class="metric-note">通过率 100%</div>
+          </div>
+        </div>
+
+        <div class="question">
+          <div class="ask-box">
+            <input class="ask-input" id="askInput" value="今天都谁出单了" aria-label="输入问题">
+            <button class="ask-button" id="askButton">提问</button>
+          </div>
+          <div class="question-label">用户问题</div>
+          <div class="question-text" id="questionText">客户是 800 人制造企业，需要 SSO、多级权限和对接 ERP，应该推荐哪个版本？</div>
+        </div>
+
+        <section class="answer">
+          <div class="answer-label">AI 建议</div>
+          <div class="answer-text" id="answerText">
+            这是销售知识助手示例问题。切换左侧入口或点击常用问题后，会展示本项目对应的 PVI 经营分析、RAG 问答、向量检索和评估结果。
+          </div>
+          <table id="answerTable">
+            <thead>
+              <tr>
+                <th>模块</th>
+                <th>判断依据</th>
+                <th>输出结果</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Demo 入口</td>
+                <td>模拟正式业务系统的知识助手界面</td>
+                <td>可展示项目能力，不暴露真实数据</td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="tag-row" id="tagRow">
+            <span class="tag">脱敏样例数据</span>
+            <span class="tag">RAG 问答</span>
+            <span class="tag">Pandas 精确查询</span>
+            <span class="tag">TF-IDF 向量检索</span>
+          </div>
+        </section>
+      </main>
+
+      <aside class="rightbar">
+        <div class="card">
+          <h3>登录用户</h3>
+          <p>数据岗 Demo</p>
+          <p class="small">部门权限：经销业务部</p>
+        </div>
+        <div class="card">
+          <h3>当前知识库</h3>
+          <div class="mini-list" id="kbList">
+            <div class="mini-item">指标口径库</div>
+            <div class="mini-item">业务规则库</div>
+            <div class="mini-item">竞赛方案库</div>
+            <div class="mini-item">报告生成规则库</div>
+          </div>
+        </div>
+        <div class="card">
+          <h3>命中资料</h3>
+          <p id="sourceInfo">4 个片段</p>
+        </div>
+        <div class="card">
+          <h3>来源文档</h3>
+          <p id="sourceDoc">rag/knowledge_base/指标口径说明.md</p>
+        </div>
+        <div class="card">
+          <h3>答案置信</h3>
+          <p id="confidenceText">需要人工确认低风险</p>
+          <div class="confidence"><span id="confidenceBar" style="width: 82%"></span></div>
+        </div>
+        <div class="card">
+          <h3>可见范围</h3>
+          <p id="scopeText">仅经销业务部展示，使用脱敏样例数据</p>
+        </div>
+        <div class="card">
+          <h3>数据安全</h3>
+          <p>真实代理人姓名、工号、保单号和投保单号不对外展示。</p>
+        </div>
+        <div class="card">
+          <h3>评估结果</h3>
+          <p><span class="status green">● 41/41 通过</span></p>
+          <p class="small">覆盖指标解释、业务规则、经营数据查询、多问题组合、口语化表达和兜底问题。</p>
+        </div>
+        <div class="card">
+          <h3>答案反馈</h3>
+          <p id="feedbackText">可记录用户反馈，用于后续优化知识库和意图识别规则。</p>
+          <div class="feedback-row">
+            <button class="feedback-button" id="goodFeedback">有帮助</button>
+            <button class="feedback-button" id="badFeedback">需修正</button>
+          </div>
+        </div>
+      </aside>
+    </div>
+
+    <div class="footer-note">
+      Demo 页面为静态产品原型，用于展示项目能力；真实计算逻辑位于 src/、rag/ 和 eval/ 目录。
+    </div>
+  </div>
+
+  <script>
+    const demos = {
+      analysis: {
+        question: "今天pvi多少",
+        answer: "今日PVI 为 10,903 元。报告日期：2026-07-28；数据来源：保单汇总列表_demo.xlsx。",
+        source: "Pandas 数据查询 · data/sample/保单汇总列表_demo.xlsx",
+        sourceDoc: "data/sample/保单汇总列表_demo.xlsx",
+        knowledgeBase: ["脱敏样例数据", "Pandas 数据查询", "经营摘要输出"],
+        confidence: "结构化数据精确计算",
+        width: "94%",
+        scope: "经营数据查询，仅展示脱敏 demo 结果",
+        rows: [
+          ["识别意图", "pvi_total_query", "PVI 金额查询"],
+          ["查询路径", "Pandas 读取 Excel 并按报告日期聚合", "今日PVI 10,903 元"],
+          ["输出文件", "output/经营摘要_20260728.txt", "可用于日报或周报"]
+        ],
+        tags: ["Pandas 精确查询", "今日PVI", "脱敏数据"]
+      },
+      active: {
+        question: "今天都谁出单了",
+        answer: "今日出单代理人共 4 人，合计 PVI 10,903 元，合计出单 6 件。具体为：代理人259（AGT0261）PVI 9,768 元、出单 2 件；代理人M（AGT0013）PVI 845 元、出单 1 件；代理人236（AGT0238）PVI 260 元、出单 1 件；代理人657（AGT0660）PVI 30 元、出单 2 件。",
+        source: "Pandas 数据查询 · src/data_query.py · data/sample/保单汇总列表_demo.xlsx",
+        sourceDoc: "src/data_query.py · data/sample/保单汇总列表_demo.xlsx",
+        knowledgeBase: ["脱敏样例数据", "Pandas 精确查询", "问答日志"],
+        confidence: "结构化数据精确计算",
+        width: "95%",
+        scope: "展示脱敏代理人编号与模拟姓名",
+        rows: [
+          ["1", "代理人259（AGT0261）", "PVI 9,768 元；出单 2 件"],
+          ["2", "代理人M（AGT0013）", "PVI 845 元；出单 1 件"],
+          ["3", "代理人236（AGT0238）", "PVI 260 元；出单 1 件"],
+          ["4", "代理人657（AGT0660）", "PVI 30 元；出单 2 件"]
+        ],
+        tags: ["出单名单", "Pandas 精确查询", "脱敏数据"]
+      },
+      report: {
+        question: "本月经营情况怎么样？",
+        answer: "截至报告日，本月累计净 PVI 为 2,143,979.82 元，月度目标达成率 71.47%，距离月度目标仍有 856,020.18 元缺口。",
+        source: "output/智能解读_20260728.txt · output/PVI经营看板_20260728.png",
+        sourceDoc: "output/智能解读_20260728.txt",
+        knowledgeBase: ["经营报告输出", "智能解读", "经营看板"],
+        confidence: "基于自动报表结果生成",
+        width: "88%",
+        scope: "适合经营日报、周报和月报引用",
+        rows: [
+          ["经营看板", "每日PVI、本月累计、代理人Top、产品/公司贡献", "PNG 看板"],
+          ["Excel报告", "多页签经营追踪与专题分析", "PVI经营报告_20260728.xlsx"],
+          ["智能解读", "目标达成、节奏判断、结构风险", "智能解读_20260728.txt"]
+        ],
+        tags: ["自动报表", "智能解读", "经营看板"]
+      },
+      agent: {
+        question: "本月哪个业务员最厉害",
+        answer: "本月代理人 PVI Top 1：代理人96（AGT0097），本月贡献 PVI 1,000,000 元。该代理人是本月头部贡献来源，需要关注其业务结构是否存在大单集中影响。",
+        source: "Pandas 数据查询 · src/data_query.py · data/sample/保单汇总列表_demo.xlsx",
+        sourceDoc: "src/data_query.py · data/sample/保单汇总列表_demo.xlsx",
+        knowledgeBase: ["脱敏样例数据", "代理人排名查询", "Pandas 精确查询"],
+        confidence: "结构化数据精确计算",
+        width: "93%",
+        scope: "展示脱敏代理人编号和模拟姓名",
+        rows: [
+          ["识别意图", "agent_ranking_query", "代理人排名查询"],
+          ["查询口径", "本月有效承保记录按代理人汇总 PVI", "按 PVI 降序排名"],
+          ["Top 1", "代理人96（AGT0097）", "1,000,000 元"]
+        ],
+        tags: ["代理人排名", "Pandas 精确查询", "脱敏数据"]
+      },
+      rules: {
+        question: "PVI达成率咋算",
+        answer: "目标达成率 = 本月累计净 PVI / 月度目标。例如本月累计净 PVI 为 2,143,979.82 元，月度目标为 3,000,000 元，则目标达成率约为 71.47%。",
+        source: "rag/knowledge_base/指标口径说明.md",
+        sourceDoc: "rag/knowledge_base/指标口径说明.md",
+        knowledgeBase: ["指标口径库", "TF-IDF 向量索引", "来源追踪"],
+        confidence: "TF-IDF 向量检索命中指标口径",
+        width: "86%",
+        scope: "指标解释类问题，不查询个人敏感信息",
+        rows: [
+          ["检索方式", "TF-IDF 向量检索 + 重排", "命中目标达成率段落"],
+          ["来源追踪", "指标口径说明.md", "返回来源和相似度"],
+          ["业务解释", "本月累计净PVI / 月度目标", "71.47%"]
+        ],
+        tags: ["RAG", "TF-IDF", "指标口径"]
+      },
+      tracking: {
+        question: "信泰方案规则是什么",
+        answer: "信泰专属方案面向信泰寿险产品：7月开单信泰寿险产品 1 件奖励 1 位出行名额；累计 PVI 不低于 20,000 元奖励 2 位；不低于 30,000 元奖励 3 位。",
+        source: "rag/knowledge_base/竞赛方案说明.md",
+        sourceDoc: "rag/knowledge_base/竞赛方案说明.md",
+        knowledgeBase: ["竞赛方案库", "业务规则库", "RAG 知识库"],
+        confidence: "业务规则文档命中",
+        width: "84%",
+        scope: "展示脱敏后的竞赛方案规则",
+        rows: [
+          ["达成标准一", "7月开单信泰寿险产品 1 件", "奖励 1 位"],
+          ["达成标准二", "累计 PVI 不低于 20,000 元", "奖励 2 位"],
+          ["达成标准三", "累计 PVI 不低于 30,000 元", "奖励 3 位"]
+        ],
+        tags: ["竞赛方案", "专题追踪", "RAG"]
+      },
+      audit: {
+        question: "这个问答系统稳定吗？",
+        answer: "当前标准评估集覆盖 41 个问题，包括指标解释、业务规则、经营数据查询、多问题组合、口语化表达和不支持问题兜底，评估结果为 41/41 通过。",
+        source: "eval/questions.json · eval/run_eval.py · logs/qa_log.jsonl",
+        sourceDoc: "eval/questions.json · logs/qa_log.jsonl",
+        knowledgeBase: ["问答评估集", "问答日志", "兜底问题"],
+        confidence: "标准评估集 100% 通过",
+        width: "100%",
+        scope: "日志仅保存在本地，logs/ 已加入 .gitignore",
+        rows: [
+          ["评估集", "41 条标准问题", "通过率 100%"],
+          ["日志记录", "问题、意图、路径、回答", "便于后续优化"],
+          ["兜底问题", "客户电话、报销等非业务问题", "避免乱答"]
+        ],
+        tags: ["问答日志", "评估集", "兜底测试"]
+      },
+      combo: {
+        question: "今天都谁出单了，本月PVI是多少，PVI是什么",
+        answer: "系统会自动拆分为 3 个问题：今日出单代理人共 4 人，分别是代理人259（AGT0261）、代理人M（AGT0013）、代理人236（AGT0238）、代理人657（AGT0660）；本月PVI 为 2,143,979.82 元；PVI 是衡量保险经销业务保费贡献的核心经营指标。",
+        source: "rag/qa.py · intent_classifier.py · data_query.py",
+        sourceDoc: "rag/qa.py · src/data_query.py",
+        knowledgeBase: ["意图识别", "Pandas 数据查询", "RAG 问答"],
+        confidence: "多问题组合识别通过",
+        width: "91%",
+        scope: "脱敏代理人编号与模拟姓名",
+        rows: [
+          ["问题1", "今天都谁出单了", "4 人：代理人259、代理人M、代理人236、代理人657"],
+          ["问题2", "本月PVI是多少", "2,143,979.82 元"],
+          ["问题3", "PVI是什么", "保费贡献的核心经营指标"]
+        ],
+        tags: ["多问题拆分", "意图识别", "Pandas + RAG"]
+      },
+      history: {
+        question: "最近用户都问过什么？",
+        answer: "系统会记录每次问答的问题、识别意图、查询路径和回答结果，便于分析用户常问问题、发现失败样本并优化知识库。",
+        source: "logs/qa_log.jsonl · rag/logger.py",
+        sourceDoc: "logs/qa_log.jsonl",
+        knowledgeBase: ["问答日志", "意图识别结果", "查询路径记录"],
+        confidence: "本地日志记录",
+        width: "89%",
+        scope: "日志仅保存在本地，不上传 GitHub",
+        rows: [
+          ["日志字段", "time / question / intent / route / answer", "支持后续分析"],
+          ["示例问题", "今天pvi多少", "pvi_total_query"],
+          ["用途", "定位高频问题和失败样本", "优化知识库与规则"]
+        ],
+        tags: ["问答历史", "日志审计", "持续优化"]
+      },
+      knowledge: {
+        question: "当前有哪些知识库？",
+        answer: "当前 Demo 包含指标口径库、业务规则库、竞赛方案库、报告生成规则库和项目说明库。知识库文档会被切分为文本片段，用于 RAG 检索和 TF-IDF 向量检索。",
+        source: "rag/knowledge_base/",
+        sourceDoc: "rag/knowledge_base/*.md",
+        knowledgeBase: ["指标口径库", "业务规则库", "竞赛方案库", "报告生成规则库", "项目说明库"],
+        confidence: "知识库目录已配置",
+        width: "92%",
+        scope: "仅包含脱敏后的业务规则和指标说明",
+        rows: [
+          ["指标口径库", "指标口径说明.md", "PVI、目标达成率、月末预测"],
+          ["业务规则库", "业务规则说明.md", "团队口径和筛选规则"],
+          ["竞赛方案库", "竞赛方案说明.md", "信泰、阳光等专题方案"]
+        ],
+        tags: ["不同知识库", "知识库管理", "RAG"]
+      },
+      upload: {
+        question: "管理员如何上传新资料？",
+        answer: "管理员可将脱敏后的业务规则、指标口径或竞赛方案文档放入 rag/knowledge_base/，随后运行 build_index.py 和 vector_index.py 重建文本索引与向量索引。",
+        source: "rag/build_index.py · rag/vector_index.py",
+        sourceDoc: "rag/knowledge_base/ · rag/vector_index.py",
+        knowledgeBase: ["管理员上传资料", "索引重建", "版本更新"],
+        confidence: "流程可复现",
+        width: "87%",
+        scope: "上传前需要先完成数据脱敏",
+        rows: [
+          ["第一步", "新增或替换 .md 文档", "rag/knowledge_base/"],
+          ["第二步", "重建文本索引", "python rag/build_index.py"],
+          ["第三步", "重建向量索引", "python rag/vector_index.py"]
+        ],
+        tags: ["管理员上传资料", "知识库更新", "向量索引"]
+      },
+      feedback: {
+        question: "答案不准确时怎么处理？",
+        answer: "用户可以标记“有帮助”或“需修正”。低质量回答会进入反馈池，后续可通过补充知识库、调整意图识别规则或扩充评估集来改进。",
+        source: "demo 反馈原型 · eval/questions.json",
+        sourceDoc: "eval/questions.json · demo/index.html",
+        knowledgeBase: ["答案反馈", "评估集", "知识库优化"],
+        confidence: "反馈闭环设计",
+        width: "90%",
+        scope: "反馈内容仅用于项目优化展示",
+        rows: [
+          ["有帮助", "答案可直接采用", "保留当前规则"],
+          ["需修正", "答案缺失或来源不准", "补充知识库或测试集"],
+          ["后续优化", "复跑 eval/run_eval.py", "验证通过率"]
+        ],
+        tags: ["答案反馈", "评估闭环", "持续迭代"]
+      }
+    };
+
+    function chooseDemoByQuestion(question) {
+      const q = question.trim().toLowerCase();
+      if (!q) return "analysis";
+      if (q.includes("都谁出单") || q.includes("谁出单") || q.includes("几个人出单") || q.includes("出单名单")) {
+        if (q.includes("本月pvi") || q.includes("pvi是什么")) return "combo";
+        return "active";
+      }
+      if (q.includes("业务员") || q.includes("代理人") || q.includes("最厉害") || q.includes("最高")) return "agent";
+      if (q.includes("达成率") || q.includes("怎么算") || q.includes("咋算")) return "rules";
+      if (q.includes("信泰") || q.includes("方案")) return "tracking";
+      if (q.includes("评估") || q.includes("日志")) return "audit";
+      if (q.includes("经营") || q.includes("看板") || q.includes("报告")) return "report";
+      return "analysis";
+    }
+
+    function renderDemo(key) {
+      const demo = demos[key];
+      document.getElementById("askInput").value = demo.question;
+      document.getElementById("questionText").textContent = demo.question;
+      document.getElementById("answerText").textContent = demo.answer;
+      document.getElementById("sourceInfo").textContent = demo.source;
+      document.getElementById("sourceDoc").textContent = demo.sourceDoc;
+      document.getElementById("confidenceText").textContent = demo.confidence;
+      document.getElementById("confidenceBar").style.width = demo.width;
+      document.getElementById("scopeText").textContent = demo.scope;
+
+      const tbody = document.querySelector("#answerTable tbody");
+      tbody.innerHTML = demo.rows.map(row => `
+        <tr>
+          <td>${row[0]}</td>
+          <td>${row[1]}</td>
+          <td>${row[2]}</td>
+        </tr>
+      `).join("");
+
+      const tagRow = document.getElementById("tagRow");
+      tagRow.innerHTML = demo.tags.map(tag => `<span class="tag">${tag}</span>`).join("");
+
+      const kbList = document.getElementById("kbList");
+      kbList.innerHTML = demo.knowledgeBase.map(item => `<div class="mini-item">${item}</div>`).join("");
+
+      document.querySelectorAll(".nav-button").forEach(button => {
+        button.classList.toggle("active", button.dataset.mode === key);
+      });
+    }
+
+    document.querySelectorAll(".nav-button").forEach(button => {
+      button.addEventListener("click", () => renderDemo(button.dataset.mode));
+    });
+
+    document.querySelectorAll(".quick-button").forEach(button => {
+      button.addEventListener("click", () => renderDemo(button.dataset.demo));
+    });
+
+    document.getElementById("askButton").addEventListener("click", () => {
+      const question = document.getElementById("askInput").value;
+      renderDemo(chooseDemoByQuestion(question));
+      document.getElementById("questionText").textContent = question || demos.analysis.question;
+    });
+
+    document.getElementById("askInput").addEventListener("keydown", event => {
+      if (event.key === "Enter") {
+        document.getElementById("askButton").click();
+      }
+    });
+
+    document.getElementById("goodFeedback").addEventListener("click", () => {
+      document.getElementById("feedbackText").textContent = "已记录：有帮助。该回答可作为高质量样例保留。";
+    });
+
+    document.getElementById("badFeedback").addEventListener("click", () => {
+      document.getElementById("feedbackText").textContent = "已记录：需修正。后续可补充知识库或扩充评估集。";
+    });
+  </script>
+</body>
+</html>

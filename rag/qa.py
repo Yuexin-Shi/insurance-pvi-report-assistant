@@ -15,6 +15,9 @@ if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
 from data_query import query_data
+from answer_generator import generate_data_answer, generate_not_found_answer, generate_rag_answer
+from intent_classifier import classify_intent, should_use_data_query
+from logger import log_qa
 
 
 def tokenize(text: str) -> list[str]:
@@ -65,9 +68,18 @@ def query_keywords(question: str) -> set[str]:
         if word.lower() in question.lower():
             keywords.add(word.lower())
     chinese_terms = [
+        "净PVI",
+        "净 PVI",
+        "每日净PVI",
+        "每日净 PVI",
+        "本月累计PVI",
+        "本月累计 PVI",
+        "最大一笔PVI",
+        "最大一笔 PVI",
         "今日PVI",
         "今日新增",
         "目标达成率",
+        "达成率",
         "目标缺口",
         "每日净",
         "本月累计",
@@ -80,14 +92,15 @@ def query_keywords(question: str) -> set[str]:
     ]
     for term in chinese_terms:
         if term in question:
-            keywords.add(term)
+            keywords.add(term.lower())
+            keywords.add(term.replace(" ", "").lower())
     return keywords
 
 
 def is_definition_question(question: str) -> bool:
     if is_result_question(question):
         return False
-    return any(pattern in question for pattern in ["是什么", "什么意思", "含义", "定义", "解释"])
+    return any(pattern in question for pattern in ["是什么", "什么意思", "含义", "定义", "解释", "怎么算", "怎么计算", "咋算"])
 
 
 def is_result_question(question: str) -> bool:
@@ -97,7 +110,6 @@ def is_result_question(question: str) -> bool:
             "今日",
             "今天",
             "本月",
-            "多少",
             "具体",
             "当前",
             "结果",
@@ -112,9 +124,11 @@ def rerank_score(question: str, item: dict[str, str], base_score: float) -> floa
     keywords = query_keywords(question)
 
     for keyword in keywords:
-        if heading == keyword:
+        compact_heading = heading.replace(" ", "")
+        compact_keyword = keyword.replace(" ", "")
+        if heading == keyword or compact_heading == compact_keyword:
             score += 1.0
-        elif keyword in heading:
+        elif keyword in heading or compact_keyword in compact_heading:
             score += 0.35
 
     if is_definition_question(question):
@@ -124,9 +138,29 @@ def rerank_score(question: str, item: dict[str, str], base_score: float) -> floa
             score += 0.5
         if any(word in item["text"] for word in ["是本项目用于", "指", "=", "定义"]):
             score += 0.15
+        if "净pvi" in question.replace(" ", "").lower():
+            if heading.replace(" ", "") == "净pvi":
+                score += 1.0
+            elif heading == "pvi":
+                score -= 0.4
+        compact_question = question.replace(" ", "").lower()
+        if "达成率" in compact_question:
+            if heading.replace(" ", "") == "目标达成率":
+                score += 1.5
+            elif heading == "pvi":
+                score -= 0.5
+        for term in ["每日净pvi", "本月累计pvi", "最大一笔pvi"]:
+            if term in compact_question:
+                if heading.replace(" ", "") == term:
+                    score += 1.0
+                elif heading == "pvi":
+                    score -= 0.4
 
     if "规则" in question and "竞赛方案说明" in source:
         score += 0.25
+
+    if "文字经营摘要" in question and "报告生成规则" in source:
+        score += 1.5
 
     if is_result_question(question) and "output/经营摘要" in source:
         score += 2.0
@@ -147,23 +181,31 @@ def search(question: str, top_k: int = 1) -> list[dict[str, str | float]]:
 
 
 def answer(question: str) -> str:
-    data_answer = query_data(question)
-    if data_answer:
-        return f"问题：{question}\n\n数据查询结果：\n{data_answer}"
+    intent = classify_intent(question)
+
+    if should_use_data_query(intent):
+        data_answer = query_data(question)
+        if data_answer:
+            response = generate_data_answer(question, intent, data_answer)
+            log_qa(question, intent, "pandas", response)
+            return response
+
+    if intent == "unknown":
+        data_answer = query_data(question)
+        if data_answer:
+            response = generate_data_answer(question, intent, data_answer)
+            log_qa(question, intent, "pandas", response)
+            return response
 
     results = search(question)
     if not results:
-        return (
-            f"问题：{question}\n\n"
-            "没有在知识库中检索到明显相关内容。"
-        )
+        response = generate_not_found_answer(question, intent)
+        log_qa(question, intent, "unknown", response)
+        return response
 
-    lines = [f"问题：{question}", "", "检索结果："]
-    for index, item in enumerate(results, start=1):
-        lines.append("")
-        lines.append(f"{index}. 来源：{item['source']}｜相关度：{item['score']:.2f}")
-        lines.append(str(item["text"]))
-    return "\n".join(lines)
+    response = generate_rag_answer(question, intent, results[0])
+    log_qa(question, intent, "rag", response)
+    return response
 
 
 def split_questions(text: str) -> list[str]:

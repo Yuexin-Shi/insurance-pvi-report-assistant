@@ -1,0 +1,14 @@
+data/raw/
+*.DS_Store
+.Rhistory
+output/.~*
+output/PVI经营报告_20260730.xlsx
+output/PVI经营看板_20260730.png
+output/经营摘要_20260730.txt
+output/智能解读_20260730.txt
+logs/
+rag/vector_index.pkl
+github-upload/
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
