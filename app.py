@@ -273,6 +273,920 @@ def determine_report_date(
 
     return pd.Timestamp(latest).normalize()
 
+
+
+def calculate_reports(
+    df: pd.DataFrame,
+    report_date: pd.Timestamp,
+    threshold: float,
+) -> dict[str, pd.DataFrame | dict[str, float] | pd.Series]:
+
+    report_date = pd.Timestamp(report_date).normalize()
+
+    # 防止误算其他年份
+    if report_date.year != ANALYSIS_YEAR:
+        raise ValueError(
+            f"报告日期必须属于{ANALYSIS_YEAR}年，"
+            f"当前日期是：{report_date:%Y-%m-%d}"
+        )
+
+    # 已承保业务按承保年份判断
+    insured_in_year = (
+        df["_insured_date"].dt.year.eq(ANALYSIS_YEAR)
+    )
+
+    # 未承保业务按交单年份判断
+    pending_submitted_in_year = (
+        df["_insured_date"].isna()
+        & df["_submit_date"].dt.year.eq(ANALYSIS_YEAR)
+    )
+
+    # 本函数再次过滤，确保所有结果只来自2026年
+    df_year = df.loc[
+        insured_in_year | pending_submitted_in_year
+    ].copy()
+
+    month_start = report_date.replace(day=1)
+    month_end = month_start + pd.offsets.MonthEnd(0)
+
+    # 本月已承保数据
+    in_period = df_year["_insured_date"].between(
+        month_start,
+        report_date,
+        inclusive="both",
+    )
+
+    mtd = df_year.loc[
+        df_year["_is_team"] & df_year["_is_valid"] & in_period
+    ].copy()
+
+    # 2026年大湾区全部相关记录
+    team_rows = df_year.loc[
+        df_year["_is_team"]
+    ].copy()
+
+    # ============================================================
+    # 安盛活力星达成追踪
+    # ============================================================
+    competition_tracking = (
+        mtd.groupby(
+            [
+                "_agency",
+                "_region",
+                "_organization",
+                "_agent_name",
+                "_agent_id",
+            ],
+            dropna=False,
+        )["_pvi"]
+        .sum()
+        .reset_index()
+        .rename(
+            columns={
+                "_agency": "所属机构",
+                "_region": "所属区域",
+                "_organization": "所属组织",
+                "_agent_name": "代理人姓名",
+                "_agent_id": "工号",
+                "_pvi": "竞赛业绩",
+            }
+        )
+        .sort_values("竞赛业绩", ascending=False)
+    )
+
+    # 只保留本月已经出单的人：按代理人汇总后，竞赛业绩必须大于0
+    competition_tracking = competition_tracking.loc[
+        competition_tracking["竞赛业绩"].gt(0)
+    ].copy()
+
+    competition_tracking["_达标差距数值"] = (
+        competition_tracking["竞赛业绩"] - threshold
+    )
+    competition_tracking["达标差距"] = [
+        "达标" if value >= 0 else value
+        for value in competition_tracking["_达标差距数值"].fillna(-threshold)
+    ]
+    competition_tracking = competition_tracking.drop(columns=["_达标差距数值"])
+    competition_tracking.insert(0, "序号", range(1, len(competition_tracking) + 1))
+    competition_tracking = competition_tracking[
+        [
+            "序号",
+            "所属机构",
+            "所属区域",
+            "所属组织",
+            "代理人姓名",
+            "工号",
+            "竞赛业绩",
+            "达标差距",
+        ]
+    ]
+
+    qualified_region_summary = (
+        competition_tracking.loc[
+            competition_tracking["达标差距"].eq("达标")
+        ]
+        .groupby("所属区域", dropna=False)
+        .size()
+        .rename("达标数")
+        .reset_index()
+        .rename(columns={"所属区域": "区域"})
+        .sort_values("达标数", ascending=False)
+    )
+    total_qualified = int(qualified_region_summary["达标数"].sum()) if not qualified_region_summary.empty else 0
+    qualified_region_summary = pd.concat(
+        [
+            qualified_region_summary,
+            pd.DataFrame([{"区域": "总计", "达标数": total_qualified}]),
+        ],
+        ignore_index=True,
+    )
+
+    # ============================================================
+    # (阳光)七八联动追踪：阳光人寿深圳分公司
+    # 口径：大湾区计划 + 阳光人寿 + ANALYSIS_YEAR年累计月份承保 + 有效保单状态。
+    # 不使用mtd，避免报告日期只覆盖单月时把七八联动数据筛空。
+    # ============================================================
+    sunshine_rows = df.loc[
+        df["_team"].eq(TEAM_KEYWORD)
+        & df["_is_valid"]
+        & text_series(df["保险公司"]).str.contains(SUNSHINE_COMPANY_KEYWORD, na=False)
+        & df["_insured_date"].dt.year.eq(ANALYSIS_YEAR)
+        & df["_insured_date"].dt.month.isin(CUMULATIVE_MONTHS)
+    ].copy()
+
+    sunshine_tracking = (
+        sunshine_rows.groupby(
+            [
+                "_agency",
+                "_region",
+                "_organization",
+                "_agent_name",
+                "_agent_id",
+            ],
+            dropna=False,
+        )
+        .agg(
+            件数=("保单号", "count"),
+            **{CUMULATIVE_PVI_COLUMN: ("_pvi", "sum")},
+        )
+        .reset_index()
+        .rename(
+            columns={
+                "_agency": "所属机构",
+                "_region": "所属区域",
+                "_organization": "所属组织",
+                "_agent_name": "代理人姓名",
+                "_agent_id": "工号",
+            }
+        )
+        .sort_values(CUMULATIVE_PVI_COLUMN, ascending=False)
+    )
+
+    sunshine_tracking = sunshine_tracking.loc[
+        sunshine_tracking[CUMULATIVE_PVI_COLUMN].gt(0)
+    ].copy()
+    sunshine_tracking["_差距数值"] = sunshine_tracking[CUMULATIVE_PVI_COLUMN] - SUNSHINE_THRESHOLD
+    sunshine_tracking["差距"] = [
+        "达标" if value >= 0 else value
+        for value in sunshine_tracking["_差距数值"].fillna(-SUNSHINE_THRESHOLD)
+    ]
+    sunshine_tracking = sunshine_tracking.drop(columns=["_差距数值"])
+    sunshine_tracking.insert(0, "序号", range(1, len(sunshine_tracking) + 1))
+    sunshine_tracking = sunshine_tracking[
+        [
+            "序号",
+            "所属机构",
+            "所属区域",
+            "所属组织",
+            "代理人姓名",
+            "工号",
+            "件数",
+            CUMULATIVE_PVI_COLUMN,
+            "差距",
+        ]
+    ]
+
+    sunshine_region_summary = (
+        sunshine_tracking.groupby("所属区域", dropna=False)
+        .agg(
+            符合参赛人数=("工号", "count"),
+            达标人数=("差距", lambda values: int((values == "达标").sum())),
+        )
+        .reset_index()
+        .rename(columns={"所属区域": "区域"})
+    )
+    sunshine_region_summary["未达标人数"] = (
+        sunshine_region_summary["符合参赛人数"] - sunshine_region_summary["达标人数"]
+    )
+    sunshine_region_summary = sunshine_region_summary.sort_values(
+        ["达标人数", "符合参赛人数"],
+        ascending=[False, False],
+    )
+    sunshine_region_summary.insert(0, "序号", range(1, len(sunshine_region_summary) + 1))
+    sunshine_totals = pd.DataFrame(
+        [
+            {
+                "序号": "总计",
+                "区域": "",
+                "符合参赛人数": int(sunshine_region_summary["符合参赛人数"].sum()) if not sunshine_region_summary.empty else 0,
+                "达标人数": int(sunshine_region_summary["达标人数"].sum()) if not sunshine_region_summary.empty else 0,
+                "未达标人数": int(sunshine_region_summary["未达标人数"].sum()) if not sunshine_region_summary.empty else 0,
+            }
+        ]
+    )
+    sunshine_region_summary = pd.concat(
+        [sunshine_region_summary, sunshine_totals],
+        ignore_index=True,
+    )
+
+    # ============================================================
+    # MDRT：全年个人PVI汇总
+    # ============================================================
+
+    # MDRT只做这几步筛选：
+    # 1. 不再限制出单团队；保单汇总列表中出单人所属区域只要产生PVI就纳入。
+    # 2. 保单状态去掉撤销/犹豫期退保/待承保/空白。
+    # 3. 承保日期只保留2026年。
+    # 4. 保留所有PVI金额，包含0和负数PVI，用于抵扣全年业绩。
+    # 5. 按出单代理人工号合并PVI；团队、机构、区域、组织统一取最后一张承保保单对应信息。
+    mdrt_valid = df.loc[
+        df["_region"].ne("")
+        & df["_insured_date"].dt.year.eq(ANALYSIS_YEAR)
+        & df["_status"].notna()
+        & df["_status"].ne("")
+        & ~df["_status"].isin(["撤销", "犹豫期退保", "待承保"])
+        & ~df["_status"].str.contains("撤销|犹豫期退保", na=False)
+    ].copy()
+
+    mdrt_valid["_mdrt_region"] = mdrt_valid["_region"]
+    fangyuan_mask = mdrt_valid["_region"].eq("方圆区")
+    mdrt_valid.loc[
+        fangyuan_mask & mdrt_valid["_agency"].eq("总部直辖"),
+        "_mdrt_region",
+    ] = "方圆区总部直辖"
+    mdrt_valid.loc[
+        fangyuan_mask & mdrt_valid["_agency"].eq("广东分公司"),
+        "_mdrt_region",
+    ] = "方圆区广东分公司"
+
+    mdrt_valid["_mdrt_organization"] = mdrt_valid["_organization"]
+    virtual_shaanxi_mask = mdrt_valid["_agent_name"].eq("虚拟总监陕西")
+    mdrt_valid.loc[
+        virtual_shaanxi_mask & mdrt_valid["_management_region"].ne(""),
+        "_mdrt_region",
+    ] = mdrt_valid.loc[
+        virtual_shaanxi_mask & mdrt_valid["_management_region"].ne(""),
+        "_management_region",
+    ]
+    mdrt_valid.loc[
+        virtual_shaanxi_mask & mdrt_valid["_management_organization"].ne(""),
+        "_mdrt_organization",
+    ] = mdrt_valid.loc[
+        virtual_shaanxi_mask & mdrt_valid["_management_organization"].ne(""),
+        "_management_organization",
+    ]
+
+    annual_valid = mdrt_valid.copy()
+
+    mdrt_pvi = (
+        mdrt_valid.groupby(["_agent_id", "_mdrt_region"], dropna=False)["_pvi"]
+        .sum()
+        .rename("全年业绩（PVI）")
+        .reset_index()
+    )
+
+    mdrt_long_term_pvi = (
+        mdrt_valid.loc[
+            mdrt_valid["_product_category"].isin(MDRT_LONG_TERM_LIFE_CATEGORIES)
+        ]
+        .groupby(["_agent_id", "_mdrt_region"], dropna=False)["_pvi"]
+        .sum()
+        .rename("长期人身险PVI")
+        .reset_index()
+    )
+
+    mdrt_pvi = mdrt_pvi.merge(
+        mdrt_long_term_pvi,
+        how="left",
+        on=["_agent_id", "_mdrt_region"],
+    )
+    mdrt_pvi["长期人身险PVI"] = mdrt_pvi["长期人身险PVI"].fillna(0.0)
+    mdrt_pvi["占比"] = (
+        mdrt_pvi["长期人身险PVI"]
+        / mdrt_pvi["全年业绩（PVI）"].where(mdrt_pvi["全年业绩（PVI）"].ne(0))
+    ).fillna(0.0)
+
+    mdrt_attrs = (
+        mdrt_valid.sort_values("_insured_date")
+        .drop_duplicates(["_agent_id", "_mdrt_region"], keep="last")
+        [
+            [
+                "_agent_id",
+                "_mdrt_region",
+                "_team",
+                "_agency",
+                "_mdrt_organization",
+                "_agent_name",
+            ]
+        ]
+    )
+
+    mdrt_tracking = (
+        mdrt_pvi.merge(mdrt_attrs, how="left", on=["_agent_id", "_mdrt_region"])
+        .rename(
+            columns={
+                "_team": "所属团队",
+                "_agency": "所属机构",
+                "_mdrt_region": "所属区域",
+                "_mdrt_organization": "所属组织",
+                "_agent_name": "代理人姓名",
+                "_agent_id": "工号",
+            }
+        )
+    )
+
+    mdrt_tracking.loc[
+        mdrt_tracking["所属区域"].eq("SUPA 威信区"),
+        "所属机构",
+    ] = "总部直辖"
+
+    mdrt_tracking.loc[
+        mdrt_tracking["所属区域"].eq("Bees 旭日区"),
+        "所属区域",
+    ] = "旭日&旭日北辰区"
+
+    mdrt_tracking.loc[
+        mdrt_tracking["所属区域"].eq("RH 喜悦区"),
+        "所属机构",
+    ] = "广东分公司"
+
+    mdrt_tracking = mdrt_tracking.sort_values(
+        "全年业绩（PVI）",
+        ascending=False,
+    )
+
+    mdrt_tracking = mdrt_tracking.loc[
+        mdrt_tracking["全年业绩（PVI）"].gt(0)
+    ].copy()
+
+    mdrt_tracking.insert(0, "序号", range(1, len(mdrt_tracking) + 1))
+
+    mdrt_tracking = mdrt_tracking[
+        [
+            "序号",
+            "所属团队",
+            "所属机构",
+            "所属区域",
+            "所属组织",
+            "代理人姓名",
+            "工号",
+            "全年业绩（PVI）",
+            "长期人身险PVI",
+            "占比",
+        ]
+    ]
+
+    # MDRT输出前再按工号聚合一次，保证同一个工号只出现一行。
+    # 团队、机构、区域、组织优先使用代理人信息表中的最终归属。
+    if not mdrt_tracking.empty:
+        agent_info_path = SELECTED_AGENT_INFO_FILE.expanduser().resolve()
+        if not agent_info_path.exists():
+            raise FileNotFoundError(f"没有找到代理人信息表：{agent_info_path}")
+
+        mdrt_agent_info = pd.read_excel(agent_info_path, dtype=object)
+        mdrt_agent_info.columns = mdrt_agent_info.columns.astype(str).str.strip()
+
+        required_mdrt_agent_columns = ["工号", "所属团队", "所属机构", "所属区域"]
+        missing_mdrt_agent_columns = [
+            column for column in required_mdrt_agent_columns
+            if column not in mdrt_agent_info.columns
+        ]
+        if missing_mdrt_agent_columns:
+            raise ValueError(f"代理人信息表缺少MDRT归属字段：{missing_mdrt_agent_columns}")
+
+        if "所属组织" not in mdrt_agent_info.columns:
+            mdrt_agent_info["所属组织"] = ""
+
+        mdrt_agent_info = mdrt_agent_info.copy()
+        mdrt_agent_info["_agent_id"] = text_series(mdrt_agent_info["工号"])
+        mdrt_agent_info["_agent_info_team"] = text_series(mdrt_agent_info["所属团队"])
+        mdrt_agent_info["_agent_info_agency"] = text_series(mdrt_agent_info["所属机构"])
+        mdrt_agent_info["_agent_info_region"] = text_series(mdrt_agent_info["所属区域"])
+        mdrt_agent_info["_agent_info_organization"] = text_series(mdrt_agent_info["所属组织"])
+
+        mdrt_agent_info_latest = (
+            mdrt_agent_info.loc[mdrt_agent_info["_agent_id"].ne("")]
+            .drop_duplicates("_agent_id", keep="last")
+            [
+                [
+                    "_agent_id",
+                    "_agent_info_team",
+                    "_agent_info_agency",
+                    "_agent_info_region",
+                    "_agent_info_organization",
+                ]
+            ]
+            .rename(columns={"_agent_id": "工号"})
+        )
+
+        mdrt_id_fallback = (
+            mdrt_tracking.drop(columns=["序号"])
+            .groupby("工号", dropna=False)
+            .agg(
+                所属团队=("所属团队", "last"),
+                所属机构=("所属机构", "last"),
+                所属区域=("所属区域", "last"),
+                所属组织=("所属组织", "last"),
+                代理人姓名=("代理人姓名", "last"),
+                **{
+                    "全年业绩（PVI）": ("全年业绩（PVI）", "sum"),
+                    "长期人身险PVI": ("长期人身险PVI", "sum"),
+                },
+            )
+            .reset_index()
+        )
+
+        mdrt_tracking = mdrt_id_fallback.merge(
+            mdrt_agent_info_latest,
+            how="left",
+            on="工号",
+        )
+
+        for target_column, agent_info_column in [
+            ("所属团队", "_agent_info_team"),
+            ("所属机构", "_agent_info_agency"),
+            ("所属区域", "_agent_info_region"),
+            ("所属组织", "_agent_info_organization"),
+        ]:
+            has_agent_info_value = (
+                mdrt_tracking[agent_info_column].notna()
+                & mdrt_tracking[agent_info_column].ne("")
+            )
+            mdrt_tracking.loc[has_agent_info_value, target_column] = mdrt_tracking.loc[
+                has_agent_info_value,
+                agent_info_column,
+            ]
+
+        mdrt_tracking["占比"] = (
+            mdrt_tracking["长期人身险PVI"]
+            / mdrt_tracking["全年业绩（PVI）"].where(mdrt_tracking["全年业绩（PVI）"].ne(0))
+        ).fillna(0.0)
+
+        mdrt_tracking = mdrt_tracking.sort_values("全年业绩（PVI）", ascending=False)
+        mdrt_tracking.insert(0, "序号", range(1, len(mdrt_tracking) + 1))
+        mdrt_tracking = mdrt_tracking[
+            [
+                "序号",
+                "所属团队",
+                "所属机构",
+                "所属区域",
+                "所属组织",
+                "代理人姓名",
+                "工号",
+                "全年业绩（PVI）",
+                "长期人身险PVI",
+                "占比",
+            ]
+        ]
+
+    # ============================================================
+    # MDRT-区域：全年区域PVI汇总
+    # ============================================================
+
+    # MDRT-区域基于MDRT个人表汇总，并按区域展示口径做指定合并。
+    mdrt_region_merge_map = {
+        "顶峰区-陈思慈总监": "顶峰区",
+        "顶峰区-龙圻溱总监": "顶峰区",
+        "Bees 旭日北辰区": "旭日&旭日北辰区",
+        "旭日&旭日北辰区-林辰龙总监": "旭日&旭日北辰区",
+        "旭日&旭日北辰区-林平总监": "旭日&旭日北辰区",
+        "Bees 旭日区": "旭日&旭日北辰区",
+    }
+    mdrt_region_source = mdrt_tracking.copy()
+    mdrt_region_source["_汇总所属区域"] = (
+        mdrt_region_source["所属区域"].replace(mdrt_region_merge_map)
+    )
+    mdrt_region_summary = (
+        mdrt_region_source.groupby(["所属团队", "_汇总所属区域"], dropna=False)["全年业绩（PVI）"]
+        .sum()
+        .rename("年度PVI")
+        .reset_index()
+        .rename(columns={"_汇总所属区域": "所属区域"})
+        .sort_values("年度PVI", ascending=False)
+    )
+
+    mdrt_region_summary = mdrt_region_summary.loc[
+        mdrt_region_summary["年度PVI"].gt(0)
+    ].copy()
+
+    mdrt_region_summary.insert(
+        0,
+        "序号",
+        range(1, len(mdrt_region_summary) + 1),
+    )
+
+    mdrt_region_summary = mdrt_region_summary[
+        ["序号", "所属团队", "所属区域", "年度PVI"]
+    ]
+
+    # ============================================================
+    # 大湾区属地代理人达成情况：固定名单
+    # ============================================================
+
+    # ============================================================
+    # 大湾区属地代理人达成情况：固定名单
+    # ============================================================
+    local_agent_tracking = pd.DataFrame(LOCAL_AGENT_ROSTER).copy()
+    local_agent_tracking["_start_date"] = pd.to_datetime(
+        local_agent_tracking["入职日期"],
+        errors="coerce",
+    ).dt.normalize()
+    local_agent_tracking["_end_date"] = pd.to_datetime(
+        local_agent_tracking["考核截止时间"].astype(str).str.replace("年", "-").str.replace("月", "-").str.replace("日", ""),
+        errors="coerce",
+    ).dt.normalize()
+
+    # 大湾区属地代理人按各自考核周期累计：入职日期 <= 承保日期 <= 考核截止时间。
+    # 这里不用 mtd，否则只会统计本月已承保，容易漏掉固定名单里已有保单的人。
+    local_agent_pvi_rows = []
+    for _, roster_row in local_agent_tracking.iterrows():
+        agent_id = roster_row["工号"]
+        start_date = roster_row["_start_date"]
+        end_date = roster_row["_end_date"]
+        agent_rows = df.loc[
+            df["_agent_id"].eq(agent_id)
+            & df["_insured_date"].between(start_date, end_date, inclusive="both")
+        ]
+        local_agent_pvi_rows.append(
+            {
+                "工号": agent_id,
+                "PVI（元）": agent_rows["_pvi"].sum(),
+            }
+        )
+
+    local_agent_pvi = pd.DataFrame(local_agent_pvi_rows)
+    local_agent_tracking = local_agent_tracking.merge(
+        local_agent_pvi,
+        how="left",
+        on="工号",
+    )
+    local_agent_tracking["PVI（元）"] = local_agent_tracking["PVI（元）"].fillna(0.0)
+    local_agent_tracking["考核差距（元）"] = local_agent_tracking["PVI（元）"] - LOCAL_AGENT_THRESHOLD
+    local_agent_tracking.insert(0, "序号", range(1, len(local_agent_tracking) + 1))
+    local_agent_tracking = local_agent_tracking[
+        [
+            "序号",
+            "所属区域",
+            "所属组织",
+            "工号",
+            "代理人姓名",
+            "PVI（元）",
+            "考核差距（元）",
+            "考核截止时间",
+            "入职日期",
+        ]
+    ]
+
+    local_agent_region_summary = (
+        local_agent_tracking.groupby("所属区域", dropna=False)
+        .agg(
+            考核人数=("工号", "count"),
+            已达标人数=("考核差距（元）", lambda values: int((values >= 0).sum())),
+        )
+        .reset_index()
+        .rename(columns={"所属区域": "区域"})
+    )
+    local_agent_region_summary["未达标人数"] = (
+        local_agent_region_summary["考核人数"] - local_agent_region_summary["已达标人数"]
+    )
+    local_agent_region_summary = local_agent_region_summary.sort_values(
+        ["考核人数", "区域"],
+        ascending=[False, True],
+    )
+    local_agent_region_summary.insert(0, "序号", range(1, len(local_agent_region_summary) + 1))
+    local_agent_total = pd.DataFrame(
+        [
+            {
+                "序号": "合计",
+                "区域": "",
+                "考核人数": int(local_agent_region_summary["考核人数"].sum()) if not local_agent_region_summary.empty else 0,
+                "已达标人数": int(local_agent_region_summary["已达标人数"].sum()) if not local_agent_region_summary.empty else 0,
+                "未达标人数": int(local_agent_region_summary["未达标人数"].sum()) if not local_agent_region_summary.empty else 0,
+            }
+        ]
+    )
+    local_agent_region_summary = pd.concat(
+        [local_agent_region_summary, local_agent_total],
+        ignore_index=True,
+    )
+
+    # ============================================================
+    # 各出单团队/出单人所属区域累计月份PVI汇总
+    # 不限制出单团队；同一区域如果属于不同团队，拆成多行展示。
+    # 月份按承保日期判断。
+    # ============================================================
+    region_month_rows = df_year.loc[
+        df_year["_is_valid"]
+        & df_year["_insured_date"].dt.year.eq(ANALYSIS_YEAR)
+        & df_year["_insured_date"].dt.month.isin(CUMULATIVE_MONTHS)
+    ].copy()
+
+    if region_month_rows.empty:
+        region_july_august_pvi = pd.DataFrame(
+            columns=["所属团队", "出单人所属区域", *MONTH_PVI_COLUMNS]
+        )
+    else:
+        region_month_rows["_region_month_summary_region"] = region_month_rows["_region"]
+        internal_virtual_shaanxi_mask = (
+            region_month_rows["_region"].eq("内部测试区域")
+            & region_month_rows["_agent_name"].eq("虚拟总监陕西")
+            & region_month_rows["_management_region"].ne("")
+        )
+        region_month_rows.loc[
+            internal_virtual_shaanxi_mask,
+            "_region_month_summary_region",
+        ] = region_month_rows.loc[
+            internal_virtual_shaanxi_mask,
+            "_management_region",
+        ]
+        region_month_rows["承保月份"] = (
+            region_month_rows["_insured_date"].dt.month.map(MONTH_PVI_MAP)
+        )
+        region_july_august_pvi = (
+            region_month_rows
+            .pivot_table(
+                index=["_team", "_region_month_summary_region"],
+                columns="承保月份",
+                values="_pvi",
+                aggfunc="sum",
+                fill_value=0.0,
+            )
+            .reset_index()
+            .rename(
+                columns={
+                    "_team": "所属团队",
+                    "_region_month_summary_region": "出单人所属区域",
+                }
+            )
+        )
+        for month_column in MONTH_PVI_COLUMNS:
+            if month_column not in region_july_august_pvi.columns:
+                region_july_august_pvi[month_column] = 0.0
+        region_sort_columns = [*reversed(MONTH_PVI_COLUMNS), "所属团队", "出单人所属区域"]
+        region_july_august_pvi = region_july_august_pvi[
+            ["所属团队", "出单人所属区域", *MONTH_PVI_COLUMNS]
+        ].sort_values(
+            region_sort_columns,
+            ascending=[False] * len(MONTH_PVI_COLUMNS) + [True, True],
+        )
+
+    # 区域展示口径合并：先按规则统一区域名称，再按团队+区域重新汇总。
+    region_month_merge_map = {
+        "Bees 旭日北辰区": "旭日 & 旭日北辰区",
+        "Bees 旭日区": "旭日 & 旭日北辰区",
+        "旭日 & 旭日北辰区–林辰龙总监": "旭日 & 旭日北辰区",
+        "旭日 & 旭日北辰区–林平总监": "旭日 & 旭日北辰区",
+        "旭日&旭日北辰区-林辰龙总监": "旭日 & 旭日北辰区",
+        "旭日&旭日北辰区-林平总监": "旭日 & 旭日北辰区",
+        "旭日&旭日北辰区": "旭日 & 旭日北辰区",
+        "顶峰区-陈思慈总监": "顶峰区",
+        "顶峰区-龙圻溱总监": "顶峰区",
+    }
+    if not region_july_august_pvi.empty:
+        region_july_august_pvi["出单人所属区域"] = (
+            region_july_august_pvi["出单人所属区域"].replace(region_month_merge_map)
+        )
+        region_july_august_pvi = (
+            region_july_august_pvi
+            .groupby(["所属团队", "出单人所属区域"], dropna=False)[MONTH_PVI_COLUMNS]
+            .sum()
+            .reset_index()
+        )
+        region_sort_columns = [*reversed(MONTH_PVI_COLUMNS), "所属团队", "出单人所属区域"]
+        region_july_august_pvi = region_july_august_pvi[
+            ["所属团队", "出单人所属区域", *MONTH_PVI_COLUMNS]
+        ].sort_values(
+            region_sort_columns,
+            ascending=[False] * len(MONTH_PVI_COLUMNS) + [True, True],
+        )
+
+    region_total = {"所属团队": "", "出单人所属区域": "合计"}
+    region_total.update(
+        {
+            month_column: float(region_july_august_pvi[month_column].sum())
+            if month_column in region_july_august_pvi.columns else 0.0
+            for month_column in MONTH_PVI_COLUMNS
+        }
+    )
+    region_total_row = pd.DataFrame([region_total])
+    region_july_august_pvi = pd.concat(
+        [region_july_august_pvi, region_total_row],
+        ignore_index=True,
+    )
+
+
+    # ============================================================
+    # 各出单机构/出单团队月度PVI汇总
+    # 保单状态已在 clean_data 中剔除撤销/犹豫期退保/待承保/空白状态。
+    # ============================================================
+    agency_team_august_rows = df_year.loc[
+        df_year["_is_valid"]
+        & df_year["_insured_date"].dt.year.eq(ANALYSIS_YEAR)
+        & df_year["_insured_date"].dt.month.eq(REPORT_MONTH)
+    ].copy()
+
+    if agency_team_august_rows.empty:
+        agency_team_august_pvi = pd.DataFrame(
+            columns=["出单机构", "出单团队", REPORT_MONTH_PVI_COLUMN]
+        )
+    else:
+        agency_team_august_pvi = (
+            agency_team_august_rows
+            .groupby(["_agency", "_team"], dropna=False)["_pvi"]
+            .sum()
+            .reset_index()
+            .rename(
+                columns={
+                    "_agency": "出单机构",
+                    "_team": "出单团队",
+                    "_pvi": REPORT_MONTH_PVI_COLUMN,
+                }
+            )
+            .sort_values(
+                ["出单机构", REPORT_MONTH_PVI_COLUMN, "出单团队"],
+                ascending=[True, False, True],
+            )
+        )
+
+    agency_team_total_row = pd.DataFrame(
+        [
+            {
+                "出单机构": "合计",
+                "出单团队": "",
+                REPORT_MONTH_PVI_COLUMN: float(agency_team_august_pvi[REPORT_MONTH_PVI_COLUMN].sum()) if REPORT_MONTH_PVI_COLUMN in agency_team_august_pvi.columns else 0.0,
+            }
+        ]
+    )
+    agency_team_august_pvi = pd.concat(
+        [agency_team_august_pvi, agency_team_total_row],
+        ignore_index=True,
+    )
+
+    # ============================================================
+    # 各出单机构/出单团队月度入职人数汇总
+    # 使用代理人信息表，按入职日期统计报告月份入职人数。
+    # ============================================================
+    agent_info_path = SELECTED_AGENT_INFO_FILE.expanduser().resolve()
+    if not agent_info_path.exists():
+        raise FileNotFoundError(f"没有找到代理人信息表：{agent_info_path}")
+
+    agent_info = pd.read_excel(agent_info_path, dtype=object)
+    agent_info.columns = agent_info.columns.astype(str).str.strip()
+
+    required_agent_columns = ["工号", "所属机构", "所属团队", "所属区域", "入职日期"]
+    missing_agent_columns = [
+        column for column in required_agent_columns
+        if column not in agent_info.columns
+    ]
+    if missing_agent_columns:
+        raise ValueError(f"代理人信息表缺少必要字段：{missing_agent_columns}")
+
+    agent_info = agent_info.copy()
+    agent_info["_hire_date"] = pd.to_datetime(agent_info["入职日期"], errors="coerce").dt.normalize()
+    agent_info["_agency"] = text_series(agent_info["所属机构"])
+    agent_info["_team"] = text_series(agent_info["所属团队"])
+    agent_info["_region"] = text_series(agent_info["所属区域"])
+    agent_info["_agent_id"] = text_series(agent_info["工号"])
+
+    report_day = pd.Timestamp(report_date).normalize()
+
+    target_hire_scope = (
+        agent_info["_team"].eq(TEAM_KEYWORD)
+        | agent_info["_region"].eq("PRINCE BARON 曜坤区")
+        | agent_info["_region"].eq("大湾区凯旋")
+        | (
+            agent_info["_region"].eq("方圆区")
+            & agent_info["_agency"].eq("总部直辖")
+        )
+    )
+    today_new_hires = agent_info.loc[
+        target_hire_scope
+        & agent_info["_hire_date"].eq(report_day)
+    ]
+    month_new_hires = agent_info.loc[
+        target_hire_scope
+        & agent_info["_hire_date"].dt.year.eq(ANALYSIS_YEAR)
+        & agent_info["_hire_date"].dt.month.eq(REPORT_MONTH)
+    ]
+    agent_hire_summary = {
+        "today_new_hires": int(today_new_hires["_agent_id"].nunique()),
+        "month_new_hires": int(month_new_hires["_agent_id"].nunique()),
+    }
+
+    august_hires = agent_info.loc[
+        agent_info["_hire_date"].dt.year.eq(ANALYSIS_YEAR)
+        & agent_info["_hire_date"].dt.month.eq(REPORT_MONTH)
+    ].copy()
+
+    if august_hires.empty:
+        agency_team_august_hires = pd.DataFrame(
+            columns=["出单机构", "出单团队", REPORT_MONTH_HIRES_COLUMN]
+        )
+    else:
+        agency_team_august_hires = (
+            august_hires
+            .groupby(["_agency", "_team"], dropna=False)["_agent_id"]
+            .nunique()
+            .reset_index()
+            .rename(
+                columns={
+                    "_agency": "出单机构",
+                    "_team": "出单团队",
+                    "_agent_id": REPORT_MONTH_HIRES_COLUMN,
+                }
+            )
+            .sort_values(
+                ["出单机构", REPORT_MONTH_HIRES_COLUMN, "出单团队"],
+                ascending=[True, False, True],
+            )
+        )
+
+    agency_team_hire_total_row = pd.DataFrame(
+        [
+            {
+                "出单机构": "合计",
+                "出单团队": "",
+                REPORT_MONTH_HIRES_COLUMN: int(agency_team_august_hires[REPORT_MONTH_HIRES_COLUMN].sum()) if REPORT_MONTH_HIRES_COLUMN in agency_team_august_hires.columns else 0,
+            }
+        ]
+    )
+    agency_team_august_hires = pd.concat(
+        [agency_team_august_hires, agency_team_hire_total_row],
+        ignore_index=True,
+    )
+
+    # ============================================================
+    # 指定区域明细：按原始保单行单独拉出，并在最后追加PVI汇总
+    # ============================================================
+    detail_columns = [column for column in df_year.columns if not str(column).startswith("_")]
+
+    def build_detail_sheet(rows: pd.DataFrame) -> pd.DataFrame:
+        detail = rows.loc[:, detail_columns].copy()
+        if "PVI" in detail.columns:
+            detail["PVI"] = parse_pvi(detail["PVI"])
+            total_pvi = float(detail["PVI"].sum())
+        else:
+            total_pvi = float(rows["_pvi"].sum())
+
+        total_row = {column: "" for column in detail.columns}
+        if len(detail.columns) > 0:
+            total_row[detail.columns[0]] = "PVI汇总"
+        if "PVI" in detail.columns:
+            total_row["PVI"] = total_pvi
+
+        return pd.concat([detail, pd.DataFrame([total_row])], ignore_index=True)
+
+    kai_xuan_detail = build_detail_sheet(
+        df_year.loc[
+            df_year["_is_valid"]
+            & df_year["_region"].eq("大湾区凯旋")
+        ].copy()
+    )
+
+    yaokun_detail = build_detail_sheet(
+        df_year.loc[
+            df_year["_is_valid"]
+            & df_year["_region"].eq("PRINCE BARON 曜坤区")
+        ].copy()
+    )
+
+    fangyuan_hq_detail = build_detail_sheet(
+        df_year.loc[
+            df_year["_is_valid"]
+            & df_year["_region"].eq("方圆区")
+            & df_year["_agency"].eq("总部直辖")
+        ].copy()
+    )
+
+    return {
+        "competition_tracking": competition_tracking,
+        "qualified_region_summary": qualified_region_summary,
+        "sunshine_tracking": sunshine_tracking,
+        "sunshine_region_summary": sunshine_region_summary,
+        "mdrt_tracking": mdrt_tracking,
+        "mdrt_region_summary": mdrt_region_summary,
+        "local_agent_tracking": local_agent_tracking,
+        "local_agent_region_summary": local_agent_region_summary,
+        "region_july_august_pvi": region_july_august_pvi,
+        "agency_team_august_pvi": agency_team_august_pvi,
+        "agency_team_august_hires": agency_team_august_hires,
+        "agent_hire_summary": agent_hire_summary,
+        "kai_xuan_detail": kai_xuan_detail,
+        "yaokun_detail": yaokun_detail,
+        "fangyuan_hq_detail": fangyuan_hq_detail,
+    }
+
+
 def style_excel(
     path: Path,
     reports: dict[str, pd.DataFrame | dict[str, int]],
@@ -635,7 +1549,7 @@ agent_file = st.file_uploader("上传代理人信息 Excel", type=["xlsx", "xls"
 
 st.info(
     "当前版本已移除图片看板、月度目标缺口、目标达成率和信泰旧方案；"
-    "保留安盛活力星、阳光联动、MDRT、区域累计PVI、机构团队汇总、属地代理人和三类全年明细。"
+    "保留安盛活力星、阳光联动、MDRT、MDRT-区域、区域累计PVI、机构团队汇总、属地代理人和三类全年明细。"
 )
 
 if st.button("生成报告", type="primary", disabled=not (policy_file and agent_file)):
@@ -652,7 +1566,6 @@ if st.button("生成报告", type="primary", disabled=not (policy_file and agent
             policy_path.write_bytes(policy_file.getbuffer())
             agent_path.write_bytes(agent_file.getbuffer())
 
-            # 更新全局配置，让 notebook 逻辑复用 Streamlit 页面选择。
             globals()["REPORT_MONTH"] = int(report_month)
             globals()["REPORT_MONTH_LABEL"] = f"{int(report_month)}月"
             globals()["CUMULATIVE_MONTHS"] = sorted(int(month) for month in cumulative_months)
