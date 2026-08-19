@@ -1,5 +1,3 @@
 pandas
-matplotlib
 openpyxl
-scikit-learn
 streamlit
