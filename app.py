@@ -134,7 +134,7 @@ def latest_source_file() -> Path:
 
 
 def text_series(series: pd.Series) -> pd.Series:
-    return series.astype("string").str.strip()
+    return series.astype("string").fillna("").str.strip()
 
 
 def parse_pvi(series: pd.Series) -> pd.Series:
