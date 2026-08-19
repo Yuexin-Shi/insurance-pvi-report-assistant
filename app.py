@@ -1529,6 +1529,67 @@ def export_excel(
 
     style_excel(output_path, reports)
 
+
+
+def answer_business_question(question: str, reports: dict | None = None) -> str:
+    q = question.strip().lower()
+    if not q:
+        return "请输入想查询的问题，例如：MDRT筛选逻辑是什么？"
+
+    if any(keyword in q for keyword in ["mdrt-区域", "mdrt区域", "区域这个sheet"]):
+        return (
+            "MDRT-区域基于最终 MDRT Sheet 汇总，不直接从原始保单重新筛选。"
+            "当前逻辑按所属团队和所属区域分组，汇总全年业绩（PVI），并保留年度PVI大于0的区域。"
+        )
+
+    if "mdrt" in q:
+        return (
+            "MDRT统计2026年所有有效承保PVI，不限制出单团队。"
+            "先剔除撤销、犹豫期退保、未承保、待承保和空白状态，再按工号汇总全年业绩。"
+            "长期人身险PVI统计产品统计分类为定期寿险、两全险、年金险、终身寿险、重疾险的PVI，"
+            "占比=长期人身险PVI/全年业绩（PVI）。"
+        )
+
+    if any(keyword in q for keyword in ["阳光", "七八联动"]):
+        return (
+            f"阳光联动口径：出单团队为{TEAM_KEYWORD}，保险公司包含{SUNSHINE_COMPANY_KEYWORD}，"
+            f"承保月份属于{CUMULATIVE_MONTH_LABEL}，保单状态为有效状态。"
+            f"按代理人工号汇总{CUMULATIVE_MONTH_LABEL}合计PVI，达到{SUNSHINE_THRESHOLD:,.0f}为达标。"
+        )
+
+    if any(keyword in q for keyword in ["安盛", "活力星", "门槛"]):
+        return (
+            f"安盛活力星口径：出单团队为{TEAM_KEYWORD}，承保月份为{REPORT_MONTH_LABEL}，"
+            f"保单状态为有效状态。按代理人工号汇总竞赛业绩，门槛为{PVI_THRESHOLD:,.0f}。"
+        )
+
+    if any(keyword in q for keyword in ["区域", "7-8", "累计pvi", "累计 pvi"]):
+        return (
+            f"区域累计PVI汇总按所属团队和出单人所属区域分组，统计{CUMULATIVE_MONTH_LABEL}内的有效承保PVI。"
+            "如果同一所属区域属于不同出单团队，会分成多行展示。部分区域名称会按当前维护规则合并。"
+        )
+
+    if any(keyword in q for keyword in ["新增", "入职"]):
+        if reports and isinstance(reports.get("agent_hire_summary"), dict):
+            hires = reports["agent_hire_summary"]
+            return (
+                f"本次报告中，今日新增为{hires.get('today_new_hires', 0)}人，"
+                f"本月累计新增为{hires.get('month_new_hires', 0)}人。"
+                "新增人数来自代理人信息表，统计范围包括大湾区计划、PRINCE BARON 曜坤区、大湾区凯旋、方圆区且所属机构为总部直辖。"
+            )
+        return "新增人数来自代理人信息表，统计今日新增和本月累计新增。需要先生成报告后，才能回答具体人数。"
+
+    if any(keyword in q for keyword in ["sheet", "输出", "有哪些表"]):
+        return "当前输出的Sheet包括：" + "、".join(FINAL_SHEETS)
+
+    if any(keyword in q for keyword in ["状态", "剔除", "有效"]):
+        return "有效保单状态会剔除：撤销、犹豫期退保、未承保、待承保和空白状态。"
+
+    return (
+        "我现在可以回答报表口径类问题，例如：MDRT筛选逻辑、MDRT-区域逻辑、"
+        "阳光联动门槛、安盛活力星门槛、区域累计PVI、今日新增人数、输出Sheet有哪些。"
+    )
+
 st.set_page_config(page_title="PVI自动化报表Demo", page_icon="📊", layout="wide")
 st.title("保险经销业务 PVI 自动化报表分析工具")
 st.caption("上传保单汇总列表和代理人信息表，自动生成新版多 Sheet Excel 报告。")
@@ -1622,5 +1683,21 @@ if st.button("生成报告", type="primary", disabled=not (policy_file and agent
 
     st.subheader("本次输出 Sheet")
     st.write(FINAL_SHEETS)
+
+    st.subheader("经营问答")
+    question = st.text_input(
+        "输入想查询的问题",
+        placeholder="例如：MDRT筛选逻辑是什么？阳光联动门槛是多少？今日新增多少人？",
+    )
+    if question:
+        st.write(answer_business_question(question, reports))
 else:
     st.warning("请先上传保单汇总列表和代理人信息表。")
+
+    st.subheader("经营问答")
+    question = st.text_input(
+        "输入想查询的问题",
+        placeholder="例如：MDRT筛选逻辑是什么？阳光联动门槛是多少？输出有哪些Sheet？",
+    )
+    if question:
+        st.write(answer_business_question(question))
